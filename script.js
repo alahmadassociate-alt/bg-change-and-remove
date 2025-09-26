@@ -12,9 +12,12 @@ uploadInput.addEventListener("change", async () => {
 
   inputImg.src = URL.createObjectURL(file);
 
+  const formData = new FormData();
+  formData.append("image_file", file);
+
   const response = await fetch("/api/removebg", {
     method: "POST",
-    body: file
+    body: formData
   });
 
   const blob = await response.blob();
