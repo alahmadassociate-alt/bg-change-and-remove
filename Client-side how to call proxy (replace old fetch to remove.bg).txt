@@ -1,0 +1,24 @@
+// client: send base64 image to your serverless proxy
+async function sendToProxyAndGetImageDataUrl(originalImage) {
+  // originalImage is an HTMLImageElement already loaded
+  const tmp = document.createElement('canvas');
+  tmp.width = originalImage.naturalWidth;
+  tmp.height = originalImage.naturalHeight;
+  tmp.getContext('2d').drawImage(originalImage, 0, 0);
+  const dataUrl = tmp.toDataURL('image/png'); // base64
+
+  const resp = await fetch('/api/removebg', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: dataUrl })
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text().catch(()=> '');
+    throw new Error('Proxy error: ' + txt);
+  }
+
+  // get returned blob (processed PNG with alpha)
+  const blob = await resp.blob();
+  return URL.createObjectURL(blob); // can be used as img.src
+}

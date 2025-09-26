@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Change or Replace Image Background</title>
+<meta name="description" content="Upload an image, remove background automatically, replace with color/gradient/palette and download.">
+
+<style>
+  :root{
+    --accent:#2563eb;
+    --accent-strong:#1f4fd8;
+    --muted:#6b7280;
+    --bg-light:#f6f7fb;
+    --panel-radius:12px;
+    --gap:18px;
+    --ui-padding:16px;
+    --shadow:0 10px 30px rgba(2,6,23,0.12);
+    --max-preview-width:760px;
+  }
+  :root[data-theme="light"]{
+    --bg: var(--bg-light);
+    --panel:#ffffff;
+    --text:#0f172a;
+    --muted:#6b7280;
+    --border:rgba(15,23,42,0.06);
+    --glass: rgba(0,0,0,0.03);
+    --checker-1: rgba(0,0,0,0.03);
+    --checker-2: rgba(255,255,255,0.03);
+  }
+  :root[data-theme="dark"]{
+    --bg: linear-gradient(180deg,#041024 0%, #071129 100%);
+    --panel: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    --text:#e6eef8;
+    --muted:#94a3b8;
+    --border:rgba(255,255,255,0.04);
+    --glass: rgba(255,255,255,0.02);
+    --checker-1: rgba(255,255,255,0.03);
+    --checker-2: rgba(0,0,0,0.03);
+  }
+
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;-webkit-font-smoothing:antialiased;}
+  body{background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:28px;box-sizing:border-box;}
+
+  .app { width:100%; max-width:1200px; display:grid; grid-template-columns: 1fr 360px; gap:var(--gap); align-items:start; }
+
+  /* panels */
+  .panel { background:var(--panel); border-radius:var(--panel-radius); padding:var(--ui-padding); border:1px solid var(--border); box-shadow:var(--shadow); }
+  .header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:6px; }
+  .title { font-weight:800; font-size:28px; margin:0; }
+  .subtitle { font-size:13px; color:var(--muted); margin-top:4px; }
+
+  /* upload area */
+  .upload-area { border:2px dashed var(--border); border-radius:10px; padding:18px; display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; background:var(--glass); min-height:140px; cursor:pointer; text-align:center; }
+  .upload-area strong { display:block; font-weight:700; margin-bottom:6px; }
+
+  /* preview */
+  .preview { display:flex; flex-direction:column; gap:12px; align-items:stretch; }
+  .preview-row { display:flex; gap:12px; align-items:flex-start; }
+  .ad-col { width:120px; min-width:120px; border-radius:8px; background:rgba(0,0,0,0.04); border:1px dashed var(--border); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:600; padding:8px; }
+  .canvas-wrap { flex:1; display:flex; flex-direction:column; gap:10px; align-items:center; }
+  .canvas-title { font-weight:700; font-size:14px; align-self:flex-start; }
+  .canvas-block { width:100%; display:flex; justify-content:center; align-items:center; border-radius:10px; padding:10px; background:transparent; }
+  canvas { display:block; max-width: var(--max-preview-width); height:auto; border-radius:8px; box-shadow:0 12px 30px rgba(2,6,23,0.08); background:transparent; }
+
+  /* controls (right column) */
+  .controls-col { display:flex; flex-direction:column; gap:12px; }
+  .controls-section { display:flex; flex-direction:column; gap:8px; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; }
+  .tab { padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:transparent; cursor:pointer; font-weight:700; color:var(--text); }
+  .tab.active { border-color:var(--accent); box-shadow:0 6px 18px rgba(2,6,23,0.06); background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+
+  .field { display:flex; flex-direction:column; gap:6px; }
+  label { font-size:13px; color:var(--muted); font-weight:700; }
+  .row { display:flex; gap:8px; align-items:center; }
+  input[type="color"], input[type="file"], input[type="text"], select { padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text); }
+  .palette { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .swatch { width:36px; height:36px; border-radius:8px; cursor:pointer; }
+
+  .slider { width:100%; }
+  .small { font-size:13px; color:var(--muted); }
+
+  /* download area under processed canvas */
+  .download-area { margin-top:6px; display:flex; flex-direction:column; gap:8px; align-items:center; width:100%; }
+  .download-buttons { display: flex; gap: 12px; justify-content: center; width: 100%; }
+  .download-btn { background:linear-gradient(180deg,var(--accent),var(--accent-strong)); color:#fff; border:none; padding:12px 20px; border-radius:12px; font-weight:800; font-size:16px; cursor:pointer; box-shadow:0 10px 30px rgba(37,99,235,0.18); min-width: 120px; }
+  .download-btn.png { background:linear-gradient(180deg,#10b981,#059669); }
+  .download-btn.jpg { background:linear-gradient(180deg,#f59e0b,#d97706); }
+
+  .gear { background:transparent; border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer; color:var(--muted); }
+
+  /* advanced export panel (always visible now) */
+  .advanced { margin-top:12px; display:flex; gap:12px; align-items:flex-end; justify-content:center; flex-wrap: wrap; background: var(--glass); border-radius: 8px; padding: 12px; border: 1px solid var(--border); }
+  .advanced .field { margin-bottom: 0; }
+  .advanced label { font-size: 12px; margin-bottom: 4px; }
+  .advanced input[type="range"] { font-size: 12px; }
+
+  footer.note { margin-top:12px; font-size:12px; color:var(--muted); text-align:center; }
+
+  /* Gradient color inputs - remove border and make solid */
+  #gradA, #gradB {
+    border: none;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  #gradA::-webkit-color-swatch, #gradB::-webkit-color-swatch {
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+  }
+
+  #gradA::-moz-color-swatch, #gradB::-moz-color-swatch {
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+  }
+
+  @media (max-width:1000px){
+    .app { grid-template-columns: 1fr; }
+    .ad-col { display:none; }
+    canvas { max-width:100%; }
+  }
+
+  @media (max-width: 600px) {
+    .advanced {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .advanced .field {
+      width: 100%;
+    }
+    
+    .download-buttons {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .download-btn {
+      width: 100%;
+      max-width: 260px;
+    }
+  }
+</style>
+</head>
+<body>
+  <main class="app">
+    <!-- LEFT: editor & preview -->
+    <section class="panel">
+      <header class="header">
+        <div>
+          <h1 class="title">Change or Replace Image Background</h1>
+          <div class="subtitle">Upload — background removal starts automatically — preview on the right</div>
+        </div>
+
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="themeToggle" class="gear" aria-label="Toggle theme">Light ☀️</button>
+        </div>
+      </header>
+
+      <div class="upload-area" id="uploadArea" tabindex="0" role="button" aria-label="Upload image area">
+        <strong>Drag & drop or click to upload an image</strong>
+        <div class="small">JPEG, PNG, WebP — max 20 MB. After upload background removal runs automatically.</div>
+        <input id="fileInput" type="file" accept="image/*" style="display:none" />
+        <div id="status" class="small">Status: Idle</div>
+      </div>
+
+      <div class="preview">
+        <div class="preview-row">
+          <div id="adLeft" class="ad-col" style="display:none;">AD LEFT</div>
+
+          <div class="canvas-wrap">
+            <div class="canvas-title">Original</div>
+            <div class="canvas-block">
+              <img id="origPreview" alt="Original preview" style="max-width:100%; display:none; border-radius:8px; box-shadow:0 10px 30px rgba(2,6,23,0.06);" />
+            </div>
+          </div>
+
+          <div class="canvas-wrap" id="processedWrap" style="position:relative;">
+            <div class="canvas-title">Processed</div>
+            <div class="canvas-block">
+              <canvas id="procCanvas" style="display:none;"></canvas>
+            </div>
+
+            <!-- Download area directly below the processed canvas -->
+            <div class="download-area" id="downloadArea" style="display:none;">
+              <div class="download-buttons">
+                <button id="downloadPng" class="download-btn png" disabled>Download PNG</button>
+                <button id="downloadJpg" class="download-btn jpg" disabled>Download JPG</button>
+              </div>
+
+              <!-- advanced settings always visible now -->
+              <div id="advancedPanel" class="advanced">
+                <div class="field">
+                  <label for="qualityRange">Quality</label>
+                  <input id="qualityRange" class="slider" type="range" min="0.2" max="1" step="0.01" value="0.7">
+                  <div class="small" id="qualityLabel">70%</div>
+                </div>
+                <div class="field">
+                  <label><input id="exportOriginal" type="checkbox"> Export at original resolution</label>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div id="adRight" class="ad-col" style="display:none;">AD RIGHT</div>
+        </div>
+
+        <div id="adBottom" class="ad-col" style="display:none; margin-top:12px;">AD BOTTOM</div>
+      </div>
+
+      
+    </section>
+
+    <!-- RIGHT: controls -->
+    <aside class="panel controls-col" aria-label="Controls">
+      <div class="controls-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:800;">Background</div>
+          <div class="small">Pick type</div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Background type">
+          <button class="tab active" data-type="transparent">Transparent</button>
+          <button class="tab" data-type="color">Color</button>
+          <button class="tab" data-type="gradient">Gradient</button>
+          <button class="tab" data-type="image">Image</button>
+        </div>
+
+        <!-- color + quick palette -->
+        <div id="colorBlock" class="field">
+          <label>Color & quick palette</label>
+          <div class="row">
+            <input id="colorPicker" type="color" value="#ffffff" aria-label="Color picker">
+            <input id="hexInput" type="text" placeholder="#ffffff" aria-label="Hex input" style="flex:1;">
+          </div>
+          <div class="palette" id="quickPalette">
+            <!-- 10 charming colors -->
+            <div class="swatch" style="background:#ffffff" data-color="#ffffff" title="#ffffff"></div>
+            <div class="swatch" style="background:#0ea5e9" data-color="#0ea5e9" title="#0ea5e9"></div>
+            <div class="swatch" style="background:#7c3aed" data-color="#7c3aed" title="#7c3aed"></div>
+            <div class="swatch" style="background:#f59e0b" data-color="#f59e0b" title="#f59e0b"></div>
+            <div class="swatch" style="background:#fb7185" data-color="#fb7185" title="#fb7185"></div>
+            <div class="swatch" style="background:#34d399" data-color="#34d399" title="#34d399"></div>
+            <div class="swatch" style="background:#fde68a" data-color="#fde68a" title="#fde68a"></div>
+            <div class="swatch" style="background:#a78bfa" data-color="#a78bfa" title="#a78bfa"></div>
+            <div class="swatch" style="background:#fbcfe8" data-color="#fbcfe8" title="#fbcfe8"></div>
+            <div class="swatch" style="background:#60a5fa" data-color="#60a5fa" title="#60a5fa"></div>
+          </div>
+        </div>
+
+        <!-- gradient block -->
+        <div id="gradientBlock" class="field" style="display:none;">
+          <label>Gradient</label>
+          <div class="row">
+            <input id="gradA" type="color" value="#0ea5e9" aria-label="Gradient colour A">
+            <input id="gradB" type="color" value="#7c3aed" aria-label="Gradient colour B">
+          </div>
+        </div>
+
+        <!-- image upload background -->
+        <div id="imageBlock" class="field" style="display:none;">
+          <label>Upload background image</label>
+          <input id="bgUpload" type="file" accept="image/*">
+          <div class="small">Background image will be resized to fit the canvas.</div>
+        </div>
+
+      </div>
+
+      <hr style="border:none; height:1px; background:var(--border); margin:6px 0;">
+
+      <div class="controls-section">
+        <div style="font-weight:800;">Adjustments</div>
+
+        <div class="field">
+          <label>Scale (subject size)</label>
+          <input id="scaleRange" class="slider" type="range" min="0.2" max="3" step="0.01" value="1">
+          <div class="small" id="scaleLabel">100%</div>
+        </div>
+
+        <div class="field">
+          <label>Brightness</label>
+          <input id="brightness" class="slider" type="range" min="0.6" max="1.6" step="0.01" value="1">
+        </div>
+
+        <div class="field">
+          <label>Contrast</label>
+          <input id="contrast" class="slider" type="range" min="0.6" max="1.6" step="0.01" value="1">
+        </div>
+
+        </div>
+
+      <hr style="border:none; height:1px; background:var(--border); margin:6px 0;">
+
+      <div class="controls-section">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:800;">Ads (placeholders)</div>
+          <div class="small">Toggle UI ad panels</div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button id="adLeftToggle" class="gear" aria-pressed="false">Left</button>
+          <button id="adRightToggle" class="gear" aria-pressed="false">Right</button>
+          <button id="adBottomToggle" class="gear" aria-pressed="false">Bottom</button>
+        </div>
+      </div>
+
+         </aside>
+  </main>
+
+<script>
+/* ================= CONFIG ================= */
+
+const REMOVE_BG_ENDPOINT = "https://api.remove.bg/v1.0/removebg";
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+/* ================= DOM ================= */
+const fileInput = document.getElementById('fileInput');
+const uploadArea = document.getElementById('uploadArea');
+const statusEl = document.getElementById('status');
+
+const origPreview = document.getElementById('origPreview');
+const procCanvas = document.getElementById('procCanvas');
+const procCtx = procCanvas.getContext('2d');
+
+const downloadArea = document.getElementById('downloadArea');
+const downloadPng = document.getElementById('downloadPng');
+const downloadJpg = document.getElementById('downloadJpg');
+const qualityRange = document.getElementById('qualityRange');
+const qualityLabel = document.getElementById('qualityLabel');
+const exportOriginal = document.getElementById('exportOriginal');
+
+const tabs = Array.from(document.querySelectorAll('.tab'));
+const colorBlock = document.getElementById('colorBlock');
+const gradientBlock = document.getElementById('gradientBlock');
+const imageBlock = document.getElementById('imageBlock');
+
+const colorPicker = document.getElementById('colorPicker');
+const hexInput = document.getElementById('hexInput');
+const quickPalette = document.getElementById('quickPalette');
+const gradA = document.getElementById('gradA');
+const gradB = document.getElementById('gradB');
+const bgUpload = document.getElementById('bgUpload');
+
+const scaleRange = document.getElementById('scaleRange');
+const scaleLabel = document.getElementById('scaleLabel');
+const brightnessEl = document.getElementById('brightness');
+const contrastEl = document.getElementById('contrast');
+
+const procWrap = document.getElementById('processedWrap');
+const adLeft = document.getElementById('adLeft');
+const adRight = document.getElementById('adRight');
+const adBottom = document.getElementById('adBottom');
+const adLeftToggle = document.getElementById('adLeftToggle');
+const adRightToggle = document.getElementById('adRightToggle');
+const adBottomToggle = document.getElementById('adBottomToggle');
+
+const themeToggle = document.getElementById('themeToggle');
+
+const DEFAULT_THEME = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', DEFAULT_THEME);
+updateThemeButton();
+
+/* ================= STATE ================= */
+let originalImage = null;      // HTMLImageElement of original user image
+let processedImage = null;     // HTMLImageElement received from remove.bg
+let bgImage = null;            // Image used as background if uploaded
+let currentBgType = 'transparent';
+let chosenPaletteColor = '#ffffff';
+let scale = parseFloat(scaleRange.value) || 1;
+
+/* ========== Utility functions ========== */
+function setStatus(text){ statusEl.textContent = 'Status: ' + text; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function dataURLToBlob(dataurl){
+  const parts = dataurl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bstr = atob(parts[1]); let n=bstr.length; const u8 = new Uint8Array(n);
+  while(n--) u8[n] = bstr.charCodeAt(n);
+  return new Blob([u8], { type: mime });
+}
+function loadImageFromBlob(blob){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = ()=> { URL.revokeObjectURL(url); res(img); };
+    img.onerror = e => { URL.revokeObjectURL(url); rej(e); };
+    img.crossOrigin = "anonymous";
+    img.src = url;
+  });
+}
+function loadImageFromDataUrl(dataUrl){
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = ()=> res(img);
+    img.onerror = rej;
+    img.crossOrigin = "anonymous";
+    img.src = dataUrl;
+  });
+}
+
+/* Fit calculation for preview drawing (keeps aspect but scaled down to preview box) */
+function computeFit(canvasW, canvasH, iw, ih, padding=0.95){
+  const scale = Math.min(canvasW / iw, canvasH / ih) * padding;
+  const w = iw * scale;
+  const h = ih * scale;
+  const x = (canvasW - w) / 2;
+  const y = (canvasH - h) / 2;
+  return { x, y, w, h };
+}
+
+/* ========== THEME BUTTON ========== */
+function updateThemeButton(){
+  const t = document.documentElement.getAttribute('data-theme');
+  if(t === 'light'){ themeToggle.textContent = 'Dark 🌙'; themeToggle.title = 'Switch to Dark'; }
+  else { themeToggle.textContent = 'Light ☀️'; themeToggle.title = 'Switch to Light'; }
+}
+themeToggle.addEventListener('click', ()=>{
+  const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  updateThemeButton();
+});
+
+/* ========== UPLOAD HANDLING (drag & click) ========== */
+uploadArea.addEventListener('click', ()=> fileInput.click());
+uploadArea.addEventListener('keydown', (e)=> { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+uploadArea.addEventListener('dragover', (e)=> { e.preventDefault(); uploadArea.style.borderColor = 'var(--accent)'; });
+uploadArea.addEventListener('dragleave', (e)=> { e.preventDefault(); uploadArea.style.borderColor = ''; });
+uploadArea.addEventListener('drop', (e)=> {
+  e.preventDefault(); uploadArea.style.borderColor = '';
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f){ fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event('change')); }
+});
+
+/* When user selects a file: load local preview and submit to remove.bg */
+fileInput.addEventListener('change', async (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  if(!f.type.startsWith('image/')){ alert('Please select an image file.'); return; }
+  if(f.size > MAX_FILE_SIZE){ alert('File too large (max 20MB).'); return; }
+
+  setStatus('Loading image locally...');
+  const reader = new FileReader();
+  reader.onload = async ()=> {
+    try{
+      originalImage = await loadImageFromDataUrl(reader.result);
+      // show small original preview scaled to UI
+      origPreview.src = reader.result;
+      origPreview.style.display = 'block';
+
+      // set canvas at original image resolution (important)
+      procCanvas.width = originalImage.naturalWidth;
+      procCanvas.height = originalImage.naturalHeight;
+
+      // hide download until processed
+      downloadArea.style.display = 'none';
+      downloadPng.disabled = true;
+      downloadJpg.disabled = true;
+
+      // automatically call remove.bg
+      setStatus('Uploading to remove.bg for background removal...');
+      await callRemoveBgWithDataUrl(reader.result);
+    }catch(err){
+      console.error(err);
+      setStatus('Failed to load image');
+      alert('Could not load image.');
+    }
+  };
+  reader.onerror = ()=> { setStatus('Failed to read file'); alert('File read error'); };
+  reader.readAsDataURL(f);
+});
+
+/* ========== remove.bg call (client-side) ========== */
+async function callRemoveBgWithDataUrl(dataUrl){
+  try{
+    // Prepare blob from dataUrl
+    const blob = dataURLToBlob(dataUrl);
+    const form = new FormData();
+    form.append('image_file', blob, 'upload.png');
+
+    // Call remove.bg API directly (client-side). For production use a server proxy.
+    setStatus('Calling remove.bg...');
+    const resp = await fetch(REMOVE_BG_ENDPOINT, {
+      method: 'POST',
+      headers: { 'X-Api-Key': REMOVE_BG_API_KEY },
+      body: form
+    });
+
+    if(!resp.ok){
+      const txt = await resp.text().catch(()=> '');
+      throw new Error('remove.bg error: ' + resp.status + ' ' + txt);
+    }
+
+    setStatus('Downloading result...');
+    const resultBlob = await resp.blob();
+    processedImage = await loadImageFromBlob(resultBlob);
+
+    // resize canvas to processed image dimensions (match original natural resolution)
+    procCanvas.width = processedImage.naturalWidth;
+    procCanvas.height = processedImage.naturalHeight;
+
+    // render
+    setStatus('Rendering processed preview...');
+    renderProcessed();
+
+    downloadArea.style.display = 'flex';
+    downloadPng.disabled = false;
+    downloadJpg.disabled = false;
+    setStatus('Ready');
+  }catch(err){
+    console.error(err);
+    setStatus('Background removal failed');
+    alert('Background removal failed: ' + (err.message || err));
+  }
+}
+
+/* ========== RENDERING processed preview considering background choice and adjustments ========== */
+function renderProcessed(){
+  if(!processedImage) return;
+
+  // clear
+  procCtx.clearRect(0,0,procCanvas.width, procCanvas.height);
+
+  // Draw background according to current type
+  if(currentBgType === 'transparent'){
+    // keep canvas transparent (but for preview we will show checkerboard in CSS by drawing)
+    // For visual effect in canvas, draw checkerboard
+    const s = 16;
+    const c1 = getComputedStyle(document.documentElement).getPropertyValue('--checker-1').trim() || 'rgba(0,0,0,0.03)';
+    const c2 = getComputedStyle(document.documentElement).getPropertyValue('--checker-2').trim() || 'rgba(255,255,255,0.03)';
+    for(let y=0; y<procCanvas.height; y+=s){
+      for(let x=0; x<procCanvas.width; x+=s){
+        procCtx.fillStyle = ((x/s + y/s) % 2 === 0) ? c1 : c2;
+        procCtx.fillRect(x,y,s,s);
+      }
+    }
+  } else if(currentBgType === 'color'){
+    procCtx.fillStyle = chosenPaletteColor || '#ffffff';
+    procCtx.fillRect(0,0,procCanvas.width, procCanvas.height);
+  } else if(currentBgType === 'gradient'){
+    const g = procCtx.createLinearGradient(0,0,procCanvas.width, procCanvas.height);
+    g.addColorStop(0, gradA.value);
+    g.addColorStop(1, gradB.value);
+    procCtx.fillStyle = g;
+    procCtx.fillRect(0,0,procCanvas.width, procCanvas.height);
+  } else if(currentBgType === 'image' && bgImage){
+    // draw background image stretched to cover
+    procCtx.drawImage(bgImage, 0, 0, procCanvas.width, procCanvas.height);
+  } else {
+    // fallback white
+    procCtx.fillStyle = '#ffffff';
+    procCtx.fillRect(0,0,procCanvas.width, procCanvas.height);
+  }
+
+  // Apply filters (brightness/contrast)
+  const b = parseFloat(brightnessEl.value) || 1;
+  const c = parseFloat(contrastEl.value) || 1;
+  // Note: canvas context filter syntax supports brightness and contrast
+  procCtx.save();
+  procCtx.filter = `brightness(${b}) contrast(${c})`;
+
+  // Now draw the processed image (subject with alpha) scaled according to 'scale'
+  const iw = processedImage.naturalWidth, ih = processedImage.naturalHeight;
+  // To scale subject relative to canvas, we compute base fit and then apply scale
+  const base = Math.min(procCanvas.width/iw, procCanvas.height/ih) * 0.95;
+  const w = iw * base * scale;
+  const h = ih * base * scale;
+  const x = (procCanvas.width - w) / 2;
+  const y = (procCanvas.height - h) / 2;
+  procCtx.drawImage(processedImage, x, y, w, h);
+
+  procCtx.restore();
+
+  // Ensure preview canvas is visible and responsive: it will show at full natural resolution but scaled down by CSS
+  procCanvas.style.display = 'block';
+}
+
+/* ========== UI wiring: tabs for background types ========== */
+tabs.forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    tabs.forEach(t=> t.classList.toggle('active', t === tab));
+    const type = tab.getAttribute('data-type');
+    currentBgType = type;
+    // show/hide blocks
+    colorBlock.style.display = (type === 'color') ? 'block' : 'none';
+    gradientBlock.style.display = (type === 'gradient') ? 'block' : 'none';
+    imageBlock.style.display = (type === 'image') ? 'block' : 'none';
+    // if switching back to transparent, keep checkerboard
+    renderProcessed();
+  });
+});
+
+/* quick palette behavior */
+colorPicker.addEventListener('input', ()=> { hexInput.value = colorPicker.value; chosenPaletteColor = colorPicker.value; renderProcessed(); });
+hexInput.addEventListener('change', ()=> { let v = hexInput.value.trim(); if(!v.startsWith('#')) v = '#' + v; colorPicker.value = v; chosenPaletteColor = v; renderProcessed(); });
+Array.from(quickPalette.children).forEach(s => {
+  s.addEventListener('click', ()=> {
+    const c = s.getAttribute('data-color');
+    colorPicker.value = c; hexInput.value = c; chosenPaletteColor = c;
+    currentBgType = 'color';
+    // ensure tab activated
+    tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-type') === 'color'));
+    renderProcessed();
+  });
+});
+
+/* gradient inputs */
+gradA.addEventListener('input', renderProcessed);
+gradB.addEventListener('input', renderProcessed);
+
+/* background image upload (user-provided background) */
+bgUpload.addEventListener('change', async (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  if(!f.type.startsWith('image/')){ alert('Please select an image file.'); return; }
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    try{
+      bgImage = await loadImageFromDataUrl(reader.result);
+      currentBgType = 'image';
+      tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-type') === 'image'));
+      renderProcessed();
+    }catch(err){ console.error(err); alert('Failed to load background image'); }
+  };
+  reader.readAsDataURL(f);
+});
+
+/* scale/adjust sliders */
+scaleRange.addEventListener('input', ()=> { scale = parseFloat(scaleRange.value); scaleLabel.textContent = Math.round(scale*100) + '%'; renderProcessed(); });
+brightnessEl.addEventListener('input', renderProcessed);
+contrastEl.addEventListener('input', renderProcessed);
+
+/* sync quality label */
+qualityRange.addEventListener('input', ()=> { qualityLabel.textContent = Math.round(parseFloat(qualityRange.value) * 100) + '%'; });
+
+/* ads toggles */
+adLeftToggle.addEventListener('click', ()=> toggleAd(adLeftToggle, adLeft));
+adRightToggle.addEventListener('click', ()=> toggleAd(adRightToggle, adRight));
+adBottomToggle.addEventListener('click', ()=> toggleAd(adBottomToggle, adBottom));
+function toggleAd(btn, el){
+  const visible = el.style.display === 'none' || !el.style.display;
+  el.style.display = visible ? 'flex' : 'none';
+  btn.setAttribute('aria-pressed', String(visible));
+}
+
+/* ========== EXPORT / DOWNLOAD ========== */
+function downloadImage(format) {
+  if(!processedImage){ alert('No processed image available yet.'); return; }
+
+  // Determine output size
+  let outW = procCanvas.width;
+  let outH = procCanvas.height;
+  if(exportOriginal.checked){ // if user wants original resolution, use original image's resolution
+    if(originalImage && originalImage.naturalWidth){
+      outW = originalImage.naturalWidth;
+      outH = originalImage.naturalHeight;
+    }
+  }
+
+  // Prepare export canvas
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = outW;
+  exportCanvas.height = outH;
+  const ec = exportCanvas.getContext('2d');
+
+  // Draw background to export canvas (matching logic in renderProcessed)
+  if(currentBgType === 'transparent' && format === 'png'){
+    ec.clearRect(0,0,outW,outH);
+  } else if(currentBgType === 'color'){
+    ec.fillStyle = chosenPaletteColor || '#ffffff'; ec.fillRect(0,0,outW,outH);
+  } else if(currentBgType === 'gradient'){
+    const g = ec.createLinearGradient(0,0,outW,outH);
+    g.addColorStop(0, gradA.value); g.addColorStop(1, gradB.value);
+    ec.fillStyle = g; ec.fillRect(0,0,outW,outH);
+  } else if(currentBgType === 'image' && bgImage){
+    // cover background
+    ec.drawImage(bgImage, 0, 0, outW, outH);
+  } else {
+    // default white if JPEG or fallback
+    if(format === 'jpeg') { ec.fillStyle = '#ffffff'; ec.fillRect(0,0,outW,outH); }
+    else ec.clearRect(0,0,outW,outH);
+  }
+
+  // Draw processed subject into export canvas with scale relative to export canvas
+  ec.save();
+  // apply adjustments
+  ec.filter = `brightness(${parseFloat(brightnessEl.value)}) contrast(${parseFloat(contrastEl.value)})`;
+
+  const iw = processedImage.naturalWidth, ih = processedImage.naturalHeight;
+  const baseFit = Math.min(outW / iw, outH / ih) * 0.95;
+  const w = iw * baseFit * scale;
+  const h = ih * baseFit * scale;
+  const x = (outW - w) / 2;
+  const y = (outH - h) / 2;
+  ec.drawImage(processedImage, x, y, w, h);
+  ec.restore();
+
+  // Convert to dataURL with requested format & quality
+  const fmt = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const q = parseFloat(qualityRange.value) || 0.7;
+  const dataUrl = exportCanvas.toDataURL(fmt, q);
+
+  // Trigger download
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = `edited.${format === 'jpeg' ? 'jpg' : 'png'}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+downloadPng.addEventListener('click', ()=> downloadImage('png'));
+downloadJpg.addEventListener('click', ()=> downloadImage('jpeg'));
+
+/* ========== Initialization ========== */
+(function init(){
+  // default UI: transparent tab active
+  tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-type') === 'transparent'));
+
+  // quality label
+  qualityLabel.textContent = Math.round(parseFloat(qualityRange.value) * 100) + '%';
+
+  // Hide download initially
+  downloadArea.style.display = 'none';
+})();
+
+</script>
+</body>
+</html>
